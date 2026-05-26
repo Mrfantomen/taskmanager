@@ -6,6 +6,9 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+
 import java.time.LocalDate;
 
 @Entity
@@ -14,6 +17,10 @@ public class Task {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    
+    @ManyToOne
+    @JoinColumn(name = "user_id")
+    private TaskUser user;
 
     private String title;
     private String description;
@@ -70,5 +77,13 @@ public class Task {
 
     public void setDeadline(LocalDate deadline) {
         this.deadline = deadline;
+    }
+    
+    public TaskUser getUser() {
+        return user;
+    }
+
+    public void setUser(TaskUser user) {
+        this.user = user;
     }
 }
