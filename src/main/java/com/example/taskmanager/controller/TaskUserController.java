@@ -1,8 +1,10 @@
 package com.example.taskmanager.controller;
 
 
+import com.example.taskmanager.model.Task;
 import com.example.taskmanager.model.TaskUser;
 import com.example.taskmanager.service.TaskUserService;
+import com.example.taskmanager.service.TaskService;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,15 +13,20 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
+
+
 @RestController
 @RequestMapping("/users")
 public class TaskUserController {
 
-    private final TaskUserService taskUserService;
 
-    public TaskUserController(TaskUserService taskUserService) {
-        this.taskUserService = taskUserService;
-    }
+		private final TaskUserService taskUserService;
+		private final TaskService taskService;
+	
+	public TaskUserController(TaskUserService taskUserService, TaskService taskService) {
+	    this.taskUserService = taskUserService;
+	    this.taskService = taskService;
+	}
 
     @GetMapping
     public List<TaskUser> getAllUsers() {
@@ -27,10 +34,15 @@ public class TaskUserController {
     }
 
     @GetMapping("/{id}")
-    public TaskUser getUserById(@PathVariable Long id) {
+    public TaskUser getTaskUserById(@PathVariable Long id) {
         return taskUserService.getUserById(id)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "User not found"));
+    }
+    
+    @GetMapping("/{userId}/tasks")
+    public List<Task> getTasksForUser(@PathVariable Long userId) {
+        return taskService.getTasksByUserId(userId);
     }
 
 
