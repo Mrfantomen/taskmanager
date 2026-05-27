@@ -2,13 +2,15 @@
 
 A RESTful task management API built with Spring Boot, created as a learning project to explore backend development with Java, Spring, and JPA.
 
-This is an evolving project: it currently covers the core CRUD functionality and will be extended with user accounts, authentication, and a frontend as I progress through my studies.
+This is an evolving project: it currently covers task CRUD and user accounts with a one-to-many relationship, and will be extended with authentication and a frontend as I progress through my studies.
 
 ## Features
 
 - Create, read, update and delete tasks (full CRUD)
 - Each task has a title, description, completion status and deadline
-- Custom query methods for filtering tasks (by completion status and by deadline)
+- User accounts, where each task belongs to a user (one-to-many relationship)
+- Fetch all tasks belonging to a specific user
+- Custom query methods for filtering tasks (by completion status, deadline, and owner)
 - Proper HTTP status codes (e.g. `404 Not Found` for missing tasks, `204 No Content` on delete)
 - In-memory H2 database for fast, zero-setup development
 
@@ -26,15 +28,17 @@ The project follows a standard layered architecture:
 ```
 com.example.taskmanager
 ├── TaskmanagerApplication   # Application entry point
-├── model/                   # Data model (Task entity)
+├── model/                   # Data models (Task, TaskUser)
 ├── repository/              # Database access (Spring Data JPA)
 ├── service/                 # Business logic
 └── controller/              # REST endpoints (HTTP layer)
 ```
 
-A request flows from the **controller** (receives the HTTP call) to the **service** (business logic) to the **repository** (database access), keeping each layer focused on a single responsibility.
+A request flows from the **controller** (receives the HTTP call) to the **service** (business logic) to the **repository** (database access), keeping each layer focused on a single responsibility. A `Task` references the `TaskUser` it belongs to via a `@ManyToOne` relationship, stored as a foreign key.
 
 ## API endpoints
+
+### Tasks
 
 | Method | Endpoint        | Description              |
 | ------ | --------------- | ------------------------ |
@@ -43,6 +47,17 @@ A request flows from the **controller** (receives the HTTP call) to the **servic
 | POST   | `/tasks`        | Create a new task        |
 | PUT    | `/tasks/{id}`   | Update an existing task  |
 | DELETE | `/tasks/{id}`   | Delete a task            |
+
+### Users
+
+| Method | Endpoint               | Description                       |
+| ------ | ---------------------- | --------------------------------- |
+| GET    | `/users`               | Get all users                     |
+| GET    | `/users/{id}`          | Get a single user by id           |
+| POST   | `/users`               | Create a new user                 |
+| PUT    | `/users/{id}`          | Update an existing user           |
+| DELETE | `/users/{id}`          | Delete a user                     |
+| GET    | `/users/{id}/tasks`    | Get all tasks for a specific user |
 
 ## Running the application
 
@@ -91,6 +106,24 @@ Delete a task:
 curl -X DELETE http://localhost:8080/tasks/1
 ```
 
+Create a user, then create a task that belongs to them:
+
+```bash
+curl -X POST http://localhost:8080/users \
+  -H "Content-Type: application/json" \
+  -d '{"username":"johan"}'
+
+curl -X POST http://localhost:8080/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Min uppgift","completed":false,"deadline":"2026-06-01","user":{"userid":1}}'
+```
+
+Get all tasks for a specific user:
+
+```bash
+curl http://localhost:8080/users/1/tasks
+```
+
 ## Screenshots
 
 ### Application startup
@@ -115,8 +148,8 @@ A GET request to `/tasks` returns all stored tasks as JSON.
 
 Planned improvements as the project grows:
 
-- [ ] User accounts with a one-to-many relationship to tasks
-- [ ] Authentication and authorization with Spring Security
+- [x] User accounts with a one-to-many relationship to tasks
+- [ ] Authentication and authorization with Spring Security (so users only see their own tasks)
 - [ ] Input validation and centralized error handling
 - [ ] Filtering, sorting and priorities for tasks
 - [ ] Migrate from H2 to PostgreSQL
