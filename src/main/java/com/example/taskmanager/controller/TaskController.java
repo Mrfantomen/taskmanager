@@ -2,6 +2,8 @@ package com.example.taskmanager.controller;
 
 import com.example.taskmanager.model.Task;
 import com.example.taskmanager.service.TaskService;
+import com.example.taskmanager.model.TaskUser;
+import com.example.taskmanager.service.AuthService;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,16 +18,19 @@ import java.util.Optional;
 public class TaskController {
 
     private final TaskService taskService;
+    private final AuthService authService;
 
     // Konstruktor - Spring skickar in servicen automatiskt (samma mönster som i TaskService)
-    public TaskController(TaskService taskService) {
+    public TaskController(TaskService taskService, AuthService authService) {
         this.taskService = taskService;
+        this.authService = authService;
     }
 
     // GET /tasks - hämta alla uppgifter
     @GetMapping
     public List<Task> getAllTasks() {
-    	return taskService.getAllTasks();
+        TaskUser currentUser = authService.getCurrentUser();
+        return taskService.getTasksByUserId(currentUser.getUserid());
     }
 
     // GET /tasks/{id} - hämta en uppgift via id
@@ -38,15 +43,17 @@ public class TaskController {
     // POST /tasks - skapa en ny uppgift
     @PostMapping
     public Task createTask(@RequestBody Task task) {
-        // TODO: spara uppgiften via servicen och returnera den sparade
-    	Task t = taskService.saveTask(task);
-		return t;
+        TaskUser currentUser = authService.getCurrentUser();
+        task.setUser(currentUser);
+        return taskService.saveTask(task);
     }
 
     // PUT /tasks/{id} - uppdatera en befintlig uppgift
     @PutMapping("/{id}")
     public Task updateTask(@PathVariable Long id, @RequestBody Task task) {
+        TaskUser currentUser = authService.getCurrentUser();
         task.setId(id);
+        task.setUser(currentUser);
         return taskService.saveTask(task);
     }
 
