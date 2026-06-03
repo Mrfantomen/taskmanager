@@ -8,9 +8,14 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.EnumType;
 
 import java.time.LocalDate;
-
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.JoinTable;
+import java.util.Set;
+import java.util.HashSet;
 @Entity
 public class Task {
 
@@ -26,6 +31,16 @@ public class Task {
     private String description;
     private boolean completed;
     private LocalDate deadline;
+    
+    @Enumerated(EnumType.STRING)
+    private Priority priority;
+    
+    @ManyToMany
+    @JoinTable(
+        name = "task_category",
+        joinColumns = @JoinColumn(name = "task_id"),
+        inverseJoinColumns = @JoinColumn(name = "category_id"))
+    private Set<Category> categories = new HashSet<>();
 
     // Tom konstruktor krävs av JPA
     public Task() {
@@ -36,6 +51,8 @@ public class Task {
         this.description = description;
         this.completed = completed;
         this.deadline = deadline;
+        
+
     }
 
     // Getters och setters
@@ -86,4 +103,21 @@ public class Task {
     public void setUser(TaskUser user) {
         this.user = user;
     }
+    
+    public Priority getPriority() {
+        return priority;
+    }
+
+    public void setPriority(Priority priority) {
+        this.priority = priority;
+    }
+    
+    public Set<Category> getCategories() {
+        return categories;
+    }
+
+    public void setCategories(Set<Category> categories) {
+        this.categories = categories;
+    }
+
 }
