@@ -197,23 +197,74 @@ A GET request to `/tasks` returns all stored tasks as JSON.
 
 ## Roadmap
 
-Planned improvements as the project grows:
+The project is built in steps, each adding a focused layer of functionality. Completed steps are checked off; remaining steps describe what is planned and roughly in what order.
 
-- [x] User accounts with a one-to-many relationship to tasks
-- [x] Authentication and authorization with Spring Security (users only see their own tasks)
-- [x] Filtering, sorting and priorities for tasks
-- [x] Categories as their own entity with a many-to-many relationship to tasks
+### ✅ Step 1 — Core CRUD API
+
+- [x] Task entity with title, description, completion status and deadline
+- [x] Full CRUD endpoints for tasks
+- [x] In-memory H2 database, layered architecture (controller → service → repository)
+
+### ✅ Step 2 — Users and ownership
+
+- [x] `TaskUser` entity
+- [x] One-to-many relationship: each task belongs to a user
+- [x] Endpoint to fetch all tasks for a specific user
+
+### ✅ Step 3 — Authentication and authorization
+
+- [x] Spring Security configured with `SecurityConfig`
+- [x] User registration with Argon2id password hashing (OWASP-recommended)
+- [x] Users only see their own tasks on `GET /tasks` (the list endpoint)
+- [x] Server-side task ownership on `POST` and `PUT` (the request body cannot override the owner)
+- [x] Password hashes hidden from API responses
+
+> Note: object-level authorization on `GET /tasks/{id}`, `PUT /tasks/{id}` and `DELETE /tasks/{id}` is **not yet complete** — they currently fetch by id alone. This is being addressed in Step 5.
+
+### ✅ Step 4 — Richer task logic
+
+- [x] Filtering on `completed`, `dueBefore`, `priority`
+- [x] Sorting via `?sortBy=`, with an allow-list validated by a reusable `SortValidator`
+- [x] `Priority` enum (`LOW`, `MEDIUM`, `HIGH`) with automatic validation
+- [x] `Category` as its own entity, private per user, with a many-to-many relationship to tasks
 - [x] Business rules for task validation (required title, max length, no past deadlines)
-- [ ] Combining multiple filters in one request (e.g. `?completed=false&priority=HIGH`) — currently the first matching filter wins; a proper solution needs a dynamic query via `Specification` or similar
-- [ ] Re-enable CSRF protection when a web frontend is added (currently disabled because the API is consumed via curl only)
-- [ ] Proper login/logout endpoints (currently using HTTP Basic Authentication)
-- [ ] Ownership checks on update/delete so users cannot modify tasks they do not own
-- [ ] Centralized error handling with `@ControllerAdvice` and Bean Validation annotations (so that the current validation in `TaskService.validateTask` can move to a more declarative style)
-- [ ] Decide how categories behave on shared tasks (likely visible-but-read-only, or per-user tagging)
-- [ ] Migrate from H2 to PostgreSQL
-- [ ] API documentation with Swagger
-- [ ] A frontend interface
-- [ ] (Future) Sharing tasks with other users (read/write permissions)
+- [x] Seed data on startup (dev profile only)
+
+### 🔜 Step 5 — Security hardening
+
+- [ ] **Object-level authorization (BOLA/IDOR fix)**: `GET /tasks/{id}`, `PUT /tasks/{id}` and `DELETE /tasks/{id}` currently fetch by id alone. They must be scoped to the authenticated user (`findByIdAndUserUserid`) and return `404` if the task is not yours.
+- [ ] **Safer task updates**: load the existing task scoped to the user, mutate allowed fields, then save — instead of building a new `Task` from the request body (which both risks data loss and weakens ownership control).
+- [ ] **Safer task deletion**: fetch the task scoped to the user before deleting, so users cannot delete tasks they do not own.
+- [ ] **Remove or guard the `/users` endpoints**: `GET /users`, `GET /users/{id}` and `GET /users/{id}/tasks` are currently accessible to any authenticated user, which enables user enumeration and exposure of others' tasks. They will be commented out until a proper admin role exists (Step 7).
+- [ ] **Document the chosen Argon2 parameters** in `SecurityConfig` with a comment explaining the OWASP recommendation.
+
+### 🧹 Step 6 — Polish and production-readiness
+
+- [ ] **Response DTOs**: stop returning JPA entities (`Task`, `TaskUser`) directly. Map to dedicated response DTOs so new fields cannot accidentally leak through the API.
+- [ ] **Centralized error handling with `@ControllerAdvice`** and Bean Validation annotations (so that the current validation in `TaskService.validateTask` can move to a more declarative style).
+- [ ] **Combining multiple filters in one request** (e.g. `?completed=false&priority=HIGH`) — currently the first matching filter wins; a proper solution needs a dynamic query via `Specification` or similar.
+- [ ] **Remove unused repository methods** (`findByCompleted`, `findByDeadline`, `findAll` without user scope) so they cannot accidentally be used later and bypass ownership checks.
+- [ ] **Replace `System.out.println` with proper logging** (SLF4J), and avoid logging sensitive information.
+- [ ] Migrate from H2 to PostgreSQL (good opportunity to introduce Docker).
+- [ ] API documentation with Swagger / OpenAPI.
+
+### 👤 Step 7 — Admin role
+
+- [ ] Add roles to `TaskUser` (e.g. `USER`, `ADMIN`).
+- [ ] Restore the `/users` endpoints as admin-only (`@PreAuthorize` or equivalent), so an admin can list and inspect users without exposing them to regular users.
+- [ ] Decide on the bootstrap process for the first admin (seed-only in dev profile, or a one-time promotion mechanism in production).
+
+### 🌐 Step 8 — Frontend
+
+- [ ] Build a frontend interface (technology to be decided later).
+- [ ] Proper login/logout endpoints (currently using HTTP Basic Authentication).
+- [ ] Re-enable CSRF protection (currently disabled because the API is consumed via curl only).
+
+### 🔐 Step 9 — Sharing and advanced authentication
+
+- [ ] Sharing tasks with other users (read/write permissions).
+- [ ] Decide how categories behave on shared tasks (likely visible-but-read-only, or per-user tagging).
+- [ ] Multi-factor authentication (TOTP first, with an extensible design that can support additional factors like YubiKey/WebAuthn and GPG-based challenges).
 
 ## About
 
