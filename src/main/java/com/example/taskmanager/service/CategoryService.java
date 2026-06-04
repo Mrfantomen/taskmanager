@@ -6,6 +6,8 @@ import com.example.taskmanager.repository.CategoryRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import com.example.taskmanager.dto.CategoryResponse;
+import java.util.stream.Collectors;
 
 import java.util.List;
 
@@ -45,5 +47,15 @@ public class CategoryService {
     public void deleteCategory(Long categoryId, Long userid) {
         Category category = getCategoryForUser(categoryId, userid);
         categoryRepository.delete(category);
+    }
+    
+    public CategoryResponse toResponse(Category category) {
+        return CategoryResponse.from(category);
+    }
+
+    public List<CategoryResponse> toResponseList(List<Category> categories) {
+        return categories.stream()
+                .map(CategoryResponse::from)
+                .collect(java.util.stream.Collectors.toList());
     }
 }

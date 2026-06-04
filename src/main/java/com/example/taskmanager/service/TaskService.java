@@ -3,6 +3,7 @@ package com.example.taskmanager.service;
 import com.example.taskmanager.model.Priority;
 import com.example.taskmanager.model.Task;
 import com.example.taskmanager.repository.TaskRepository;
+import org.springframework.data.jpa.domain.Specification;
 
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -11,6 +12,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+import com.example.taskmanager.dto.TaskResponse;
 import com.example.taskmanager.model.Category;
 import com.example.taskmanager.repository.CategoryRepository;
 import org.springframework.http.HttpStatus;
@@ -103,9 +105,28 @@ public class TaskService {
 	    }
 	}
 	
+	public TaskResponse toResponse(Task task) {
+	    return TaskResponse.from(task);
+	}
+
+	public List<TaskResponse> toResponseList(List<Task> tasks) {
+	    return tasks.stream()
+	            .map(TaskResponse::from)
+	            .collect(java.util.stream.Collectors.toList());
+	}
+	
 	public Task getTaskByIdForUser(Long id, Long userid) {
 	    return taskRepository.findByIdAndUserUserid(id, userid)
 	            .orElseThrow(() -> new ResponseStatusException(
 	                    HttpStatus.NOT_FOUND, "Task not found"));
 	}
+	
+	public List<Task> findBySpecification(Specification<Task> spec) {
+	    return taskRepository.findAll(spec);
+	}
+	
+	public List<Task> findBySpecification(Specification<Task> spec, 
+            org.springframework.data.domain.Sort sort) {
+return taskRepository.findAll(spec, sort);
+}
 }

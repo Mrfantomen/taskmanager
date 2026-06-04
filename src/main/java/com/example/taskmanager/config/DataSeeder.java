@@ -15,6 +15,9 @@ import org.springframework.context.annotation.Profile;
 @Configuration
 @Profile("dev")
 public class DataSeeder {
+	
+	private static final org.slf4j.Logger log = 
+		    org.slf4j.LoggerFactory.getLogger(DataSeeder.class);
 
     @Bean
     public CommandLineRunner seedData(AuthService authService,
@@ -24,7 +27,7 @@ public class DataSeeder {
             createUserIfMissing(authService, "johan", "hemligt123");
             createUserIfMissing(authService, "anna", "annapass123");
             createSeedTaskIfMissing(taskUserRepository, taskRepository);
-            System.out.println(">>> Seed data ready: users johan/anna + sample task <<<");
+            log.info("Seed data ready: users johan/anna + sample task");
         };
     }
 

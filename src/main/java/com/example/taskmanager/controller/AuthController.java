@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.example.taskmanager.dto.TaskUserResponse;
 
 @RestController
 @RequestMapping("/auth")
@@ -21,8 +22,9 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<TaskUser> register(@RequestBody RegisterRequest request) {
+    public ResponseEntity<TaskUserResponse> register(@RequestBody RegisterRequest request) {
         TaskUser user = authService.register(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(user);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(TaskUserResponse.from(user));
     }
 }

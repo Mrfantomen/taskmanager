@@ -1,5 +1,6 @@
 package com.example.taskmanager.controller;
 
+import com.example.taskmanager.dto.CategoryResponse;
 import com.example.taskmanager.model.Category;
 import com.example.taskmanager.model.TaskUser;
 import com.example.taskmanager.service.AuthService;
@@ -22,29 +23,28 @@ public class CategoryController {
         this.authService = authService;
     }
 
-    // GET /categories — lista alla mina kategorier
     @GetMapping
-    public List<Category> getMyCategories() {
+    public List<CategoryResponse> getMyCategories() {
         TaskUser currentUser = authService.getCurrentUser();
-        return categoryService.getCategoriesForUser(currentUser.getUserid());
+        return categoryService.toResponseList(
+                categoryService.getCategoriesForUser(currentUser.getUserid()));
     }
 
-    // GET /categories/{id} — hämta en av mina kategorier
     @GetMapping("/{id}")
-    public Category getCategoryById(@PathVariable Long id) {
+    public CategoryResponse getCategoryById(@PathVariable Long id) {
         TaskUser currentUser = authService.getCurrentUser();
-        return categoryService.getCategoryForUser(id, currentUser.getUserid());
+        return categoryService.toResponse(
+                categoryService.getCategoryForUser(id, currentUser.getUserid()));
     }
 
-    // POST /categories — skapa en ny kategori
     @PostMapping
-    public ResponseEntity<Category> createCategory(@RequestBody Category category) {
+    public ResponseEntity<CategoryResponse> createCategory(@RequestBody Category category) {
         TaskUser currentUser = authService.getCurrentUser();
-        Category saved = categoryService.createCategory(category, currentUser);
+        CategoryResponse saved = categoryService.toResponse(
+                categoryService.createCategory(category, currentUser));
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
-    // DELETE /categories/{id} — ta bort en av mina kategorier
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteCategory(@PathVariable Long id) {
         TaskUser currentUser = authService.getCurrentUser();
