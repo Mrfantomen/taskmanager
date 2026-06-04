@@ -102,4 +102,10 @@ public class TaskService {
 	                HttpStatus.BAD_REQUEST, "Deadline cannot be in the past");
 	    }
 	}
+	
+	public Task getTaskByIdForUser(Long id, Long userid) {
+	    return taskRepository.findByIdAndUserUserid(id, userid)
+	            .orElseThrow(() -> new ResponseStatusException(
+	                    HttpStatus.NOT_FOUND, "Task not found"));
+	}
 }

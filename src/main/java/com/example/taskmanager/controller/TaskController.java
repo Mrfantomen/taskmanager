@@ -46,8 +46,8 @@ public class TaskController {
     // GET /tasks/{id} - hämta en uppgift via id
     @GetMapping("/{id}")
     public Task getTaskById(@PathVariable Long id) {
-        return taskService.getTaskById(id)
-        		.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Task not found"));
+        TaskUser currentUser = authService.getCurrentUser();
+        return taskService.getTaskByIdForUser(id, currentUser.getUserid());
     }
 
     // POST /tasks - skapa en ny uppgift
@@ -65,27 +65,29 @@ public class TaskController {
         return taskService.saveTask(task);
     }
 
-    // PUT /tasks/{id} - uppdatera en befintlig uppgift
     @PutMapping("/{id}")
     public Task updateTask(@PathVariable Long id, @RequestBody TaskRequest request) {
         TaskUser currentUser = authService.getCurrentUser();
-        Task task = new Task();
-        task.setId(id);
+        // Hämta befintlig task säkert — kastar 404 om den inte finns eller inte tillhör användaren
+        Task task = taskService.getTaskByIdForUser(id, currentUser.getUserid());
+        // Mutera tillåtna fält på den befintliga instansen
         task.setTitle(request.getTitle());
         task.setDescription(request.getDescription());
         task.setCompleted(request.isCompleted());
         task.setDeadline(request.getDeadline());
         task.setPriority(request.getPriority());
-        task.setUser(currentUser);
         taskService.assignCategories(task, request.getCategoryIds(), currentUser.getUserid());
         return taskService.saveTask(task);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteTask(@PathVariable Long id) {
+        TaskUser currentUser = authService.getCurrentUser();
+        // Verifierar ägarskap — kastar 404 om tasken inte finns eller inte tillhör användaren
+        taskService.getTaskByIdForUser(id, currentUser.getUserid());
         taskService.deleteTask(id);
         return ResponseEntity.noContent().build();
-    }
+    }    
     
     @GetMapping
     public List<Task> getAllOwnTasks(
@@ -112,5 +114,5 @@ public class TaskController {
         }
         return taskService.getTasksByUserId(userId);
     }
-    
+
 }

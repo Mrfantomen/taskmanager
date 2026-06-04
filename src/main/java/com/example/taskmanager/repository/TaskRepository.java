@@ -7,6 +7,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface TaskRepository extends JpaRepository<Task, Long> {
 
@@ -25,5 +26,7 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
 	List<Task> findByUserUserid(Long userid, Sort sort);
 	
 	List<Task> findByUserUseridAndPriority(Long userid, Priority priority);
+	
+	Optional<Task> findByIdAndUserUserid(Long id, Long userid);
 
 }

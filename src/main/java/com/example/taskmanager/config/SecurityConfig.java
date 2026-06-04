@@ -21,6 +21,10 @@ public class SecurityConfig {
 	
 	@Bean
 	public PasswordEncoder passwordEncoder() {
+	    // Argon2id with OWASP-recommended parameters (as of 2024):
+	    // saltLength=16 bytes, hashLength=32 bytes, parallelism=1,
+	    // memory=65536 KB (64 MB), iterations=3.
+	    // Source: https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html
 	    return new Argon2PasswordEncoder(16, 32, 1, 65536, 3);
 	}
 

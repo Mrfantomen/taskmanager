@@ -215,11 +215,9 @@ The project is built in steps, each adding a focused layer of functionality. Com
 
 - [x] Spring Security configured with `SecurityConfig`
 - [x] User registration with Argon2id password hashing (OWASP-recommended)
-- [x] Users only see their own tasks on `GET /tasks` (the list endpoint)
+- [x] Users only see their own tasks — on list, get, update and delete (object-level authorization fixed in Step 5)
 - [x] Server-side task ownership on `POST` and `PUT` (the request body cannot override the owner)
 - [x] Password hashes hidden from API responses
-
-> Note: object-level authorization on `GET /tasks/{id}`, `PUT /tasks/{id}` and `DELETE /tasks/{id}` is **not yet complete** — they currently fetch by id alone. This is being addressed in Step 5.
 
 ### ✅ Step 4 — Richer task logic
 
@@ -230,13 +228,13 @@ The project is built in steps, each adding a focused layer of functionality. Com
 - [x] Business rules for task validation (required title, max length, no past deadlines)
 - [x] Seed data on startup (dev profile only)
 
-### 🔜 Step 5 — Security hardening
+### ✅ Step 5 — Security hardening
 
-- [ ] **Object-level authorization (BOLA/IDOR fix)**: `GET /tasks/{id}`, `PUT /tasks/{id}` and `DELETE /tasks/{id}` currently fetch by id alone. They must be scoped to the authenticated user (`findByIdAndUserUserid`) and return `404` if the task is not yours.
-- [ ] **Safer task updates**: load the existing task scoped to the user, mutate allowed fields, then save — instead of building a new `Task` from the request body (which both risks data loss and weakens ownership control).
-- [ ] **Safer task deletion**: fetch the task scoped to the user before deleting, so users cannot delete tasks they do not own.
-- [ ] **Remove or guard the `/users` endpoints**: `GET /users`, `GET /users/{id}` and `GET /users/{id}/tasks` are currently accessible to any authenticated user, which enables user enumeration and exposure of others' tasks. They will be commented out until a proper admin role exists (Step 7).
-- [ ] **Document the chosen Argon2 parameters** in `SecurityConfig` with a comment explaining the OWASP recommendation.
+- [x] **Object-level authorization (BOLA/IDOR fix)**: `GET /tasks/{id}`, `PUT /tasks/{id}` and `DELETE /tasks/{id}` are now scoped to the authenticated user via `findByIdAndUserUserid` and return `404` if the task is not yours.
+- [x] **Safer task updates**: the existing task is now loaded and mutated rather than replaced with a new object built from the request body.
+- [x] **Safer task deletion**: task ownership is verified before deletion.
+- [x] **Remove or guard the `/users` endpoints**: `GET /users`, `GET /users/{id}` and `GET /users/{id}/tasks` now return `403 Forbidden` with a TODO comment until a proper admin role exists (Step 7).
+- [x] **Document the chosen Argon2 parameters** in `SecurityConfig` with a comment explaining the OWASP recommendation.
 
 ### 🧹 Step 6 — Polish and production-readiness
 
