@@ -1,36 +1,48 @@
-# Task Manager API
+# Task Manager
 
-A RESTful task management API built with Spring Boot, created as a learning project to explore backend development with Java, Spring, and JPA.
+A full-stack task management application built with Spring Boot and React, created as a learning project to explore backend and frontend development with Java, Spring, and modern JavaScript.
 
-This is an evolving project: it currently covers task CRUD, user accounts, authentication with Spring Security, richer task logic (filtering, sorting, priority, categories, validation), security hardening, production-readiness features (response DTOs, centralized error handling, PostgreSQL, Swagger), and a role-based admin system. It will be extended with a frontend as the project grows.
+This is an evolving project: it currently covers a complete REST API with authentication, task and category management, role-based access control, and a React frontend with session-based login, filtering, sorting and full CRUD. It will be extended with task sharing and multi-factor authentication as the project grows.
 
 ## Features
 
+### Backend
 - Create, read, update and delete tasks (full CRUD)
 - Each task has a title, description, completion status, deadline, priority and categories
 - User accounts, where each task belongs to a user (one-to-many relationship)
 - User registration with Argon2id password hashing (OWASP-recommended)
+- Session-based authentication with `POST /auth/login`, `POST /auth/logout` and `GET /auth/me`
 - Authentication and authorization with Spring Security (users only see their own tasks — list, get, update and delete)
 - Object-level authorization (BOLA/IDOR protection): tasks are always scoped to the authenticated user
 - Server-side task ownership (the API ignores any user supplied in the request body and uses the authenticated user)
 - Password hashes are never exposed in API responses (dedicated response DTOs for all entities)
 - Centralized error handling via `@ControllerAdvice` with consistent JSON error responses
+- CSRF protection via `CookieCsrfTokenRepository` for browser-based session flow
 - **Priority** as a typed enum (`LOW`, `MEDIUM`, `HIGH`) — invalid values are rejected with `400 Bad Request`
-- **Categories** as their own entity, owned per user (`@ManyToMany` relationship between tasks and categories)
+- **Categories** as their own entity, owned per user (`@ManyToMany` relationship between tasks and categories), with color support
 - **Filtering** tasks via query parameters — supports combining multiple filters: `?completed=`, `?dueBefore=`, `?priority=`, combinable via Spring Data `Specification`
 - **Sorting** tasks via `?sortBy=`, validated against an allow-list (reusable `SortValidator` class)
 - **Business rules**: titles are required, cannot be only whitespace, max 200 chars; deadlines cannot be in the past
 - Category names are normalized on save (lowercased, trimmed) so `"Work"` and `"  WORK  "` are the same category
 - Proper HTTP status codes (e.g. `201 Created` on registration, `400 Bad Request` for invalid input, `409 Conflict` for duplicate category names, `404 Not Found` for missing resources, `204 No Content` on delete)
-- Seed data on startup (dev profile only) so users `johan` and `anna` exist with categories and tasks without manual setup
+- Seed data on startup (dev profile only) so users `johan`, `anna` and `admin` exist with categories and tasks without manual setup
 - **PostgreSQL** support via Docker for persistent storage (prod profile)
 - **Swagger / OpenAPI** documentation available at `/swagger-ui.html`
 - **Role-based access control**: users have a `USER` or `ADMIN` role — admins can access `/admin/**` endpoints
 - **Admin endpoints** under `/admin/**` protected by both request-level (`SecurityConfig`) and method-level (`@PreAuthorize`) security — defence in depth
-- Seed data includes an `admin` user (dev profile only) with the `ADMIN` role
+
+### Frontend
+- Login and logout with session-based authentication (cookies)
+- Navbar showing the logged-in user and role (ADMIN badge for admin users)
+- Task list with full CRUD: create, view, edit inline, delete, mark complete/incomplete
+- Category management with a combobox — search existing, create new with a color picker
+- Filtering tasks by: search (title), completion status (All/Active/Done), priority, date range
+- Sorting tasks by: title, deadline, priority
+- Color-coded priority badges and category pills
 
 ## Tech stack
 
+### Backend
 - **Java 17**
 - **Spring Boot 3.5.14** (Spring Web, Spring Data JPA, Spring Security)
 - **Argon2id** password hashing via **Bouncy Castle**
@@ -39,14 +51,21 @@ This is an evolving project: it currently covers task CRUD, user accounts, authe
 - **Springdoc OpenAPI** for Swagger UI
 - **Maven** for build and dependency management
 
+### Frontend
+- **React 19** with **Vite 8**
+- **Tailwind CSS v4** for styling
+- Session-based auth with cookie handling (`credentials: include`)
+
 ## Architecture
 
-The project follows a standard layered architecture:
+The project is structured as a monorepo with separate `backend/` and `frontend/` directories.
+
+### Backend
 
 ```
 com.example.taskmanager
 ├── TaskmanagerApplication   # Application entry point
-├── config/                  # SecurityConfig, DataSeeder, GlobalExceptionHandler, OpenApiConfig
+├── config/                  # SecurityConfig, DataSeeder, GlobalExceptionHandler, OpenApiConfig, CorsConfig
 ├── model/                   # Data models (Task, TaskUser, Category, Priority enum, Role enum)
 ├── dto/                     # Data transfer objects (RegisterRequest, TaskRequest, TaskResponse,
 │                            #   TaskUserResponse, CategoryResponse, ErrorResponse)
@@ -57,17 +76,36 @@ com.example.taskmanager
 └── validation/              # Reusable validators (SortValidator, TaskSpecification)
 ```
 
-A request flows from the **controller** (receives the HTTP call) to the **service** (business logic, validation and DTO mapping) to the **repository** (database access), keeping each layer focused on a single responsibility. Controllers return response DTOs — never raw JPA entities. Relationships: `Task` references its owner `TaskUser` via `@ManyToOne`; `Task` and `Category` are joined via `@ManyToMany` (with a `task_category` join table); `Category` references its owner `TaskUser` via `@ManyToOne`. Spring Security sits in front of the controller layer and rejects unauthenticated requests before they reach application code.
+A request flows from the **controller** (receives the HTTP call) to the **service** (business logic, validation and DTO mapping) to the **repository** (database access), keeping each layer focused on a single responsibility. Controllers return response DTOs — never raw JPA entities. Spring Security sits in front of the controller layer and rejects unauthenticated requests before they reach application code.
+
+### Frontend
+
+```
+frontend/src
+├── api.js                   # Central fetch wrapper (CSRF token, credentials, base URL)
+├── App.jsx                  # Root component — handles auth state and routing
+└── components/
+    ├── Navbar.jsx            # Top navigation with logged-in user and logout
+    ├── LoginPage.jsx         # Login form
+    ├── TaskList.jsx          # Task list with filtering, sorting, create, edit, delete
+    ├── CreateTaskForm.jsx    # New task form with category combobox
+    ├── EditTaskForm.jsx      # Inline edit form
+    ├── TaskFilters.jsx       # Search, status, priority, date range filters
+    └── CategoryCombobox.jsx  # Search/create categories with color picker
+```
 
 ## API endpoints
 
 ### Auth
 
-| Method | Endpoint           | Description                          |
-| ------ | ------------------ | ------------------------------------ |
-| POST   | `/auth/register`   | Register a new user (public)         |
+| Method | Endpoint           | Description                                        |
+| ------ | ------------------ | -------------------------------------------------- |
+| POST   | `/auth/register`   | Register a new user (public)                       |
+| POST   | `/auth/login`      | Log in (form data: `username`, `password`)         |
+| POST   | `/auth/logout`     | Log out and invalidate the session                 |
+| GET    | `/auth/me`         | Return the currently authenticated user and role   |
 
-All other endpoints require authentication. HTTP Basic Authentication is currently used for development.
+All other endpoints require authentication via session cookie (JSESSIONID).
 
 ### Tasks
 
@@ -118,14 +156,17 @@ All admin endpoints require the `ADMIN` role. Protected by both `SecurityConfig`
 
 - Java 17 or higher
 - Maven (or use the included Maven wrapper)
+- Node.js 20 or higher (for the frontend)
+- nvm recommended for managing Node versions
 
-### Start the app (dev profile — H2 in-memory database)
+### Start the backend (dev profile — H2 in-memory database)
 
 ```bash
+cd backend
 ./mvnw spring-boot:run
 ```
 
-The application starts on `http://localhost:8080`. The dev profile seeds three users automatically:
+The backend starts on `http://localhost:8080`. The dev profile seeds three users automatically:
 
 | Username | Password     | Role    |
 | -------- | ------------ | ------- |
@@ -135,7 +176,7 @@ The application starts on `http://localhost:8080`. The dev profile seeds three u
 
 Johan gets a welcome task with categories and HIGH priority. Anna gets a medium priority task.
 
-### Start the app (prod profile — PostgreSQL)
+### Start the backend (prod profile — PostgreSQL)
 
 First start the PostgreSQL container:
 
@@ -154,13 +195,25 @@ sudo docker run --name taskmanager-db \
   -d postgres:16
 ```
 
-Then start the app with the prod profile:
+Then start the backend with the prod profile:
 
 ```bash
+cd backend
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=prod
 ```
 
 Data persists across restarts when using PostgreSQL.
+
+### Start the frontend
+
+```bash
+cd frontend
+nvm use 24
+npm install
+npm run dev
+```
+
+The frontend starts on `http://localhost:5173`. Make sure the backend is running on `http://localhost:8080`.
 
 ### API documentation
 
@@ -170,81 +223,23 @@ Swagger UI is available at:
 http://localhost:8080/swagger-ui.html
 ```
 
-## Example usage
-
-Register a user:
-
-```bash
-curl -X POST http://localhost:8080/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"username":"johan","password":"hemligt123"}'
-```
-
-> The `dev` profile seeds `johan` and `anna` automatically, so this step is optional locally.
-
-Create a couple of categories:
-
-```bash
-curl -u johan:hemligt123 -X POST http://localhost:8080/categories \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Work","color":"#FF5733"}'
-
-curl -u johan:hemligt123 -X POST http://localhost:8080/categories \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Personal","color":"#33C7FF"}'
-```
-
-Create a task with priority and categories:
-
-```bash
-curl -u johan:hemligt123 -X POST http://localhost:8080/tasks \
-  -H "Content-Type: application/json" \
-  -d '{"title":"Prepare meeting","completed":false,"deadline":"2026-12-15","priority":"HIGH","categoryIds":[1,2]}'
-```
-
-Filter and combine filters:
-
-```bash
-# Only HIGH priority tasks that are not completed
-curl -u johan:hemligt123 "http://localhost:8080/tasks?priority=HIGH&completed=false"
-
-# Tasks with deadline before a certain date, sorted by title
-curl -u johan:hemligt123 "http://localhost:8080/tasks?dueBefore=2026-12-31&sortBy=title"
-```
-
-Update a task:
-
-```bash
-curl -u johan:hemligt123 -X PUT http://localhost:8080/tasks/1 \
-  -H "Content-Type: application/json" \
-  -d '{"title":"Prepare meeting","description":"Slides ready","completed":true,"deadline":"2026-12-15","priority":"MEDIUM","categoryIds":[1]}'
-```
-
-Delete a task:
-
-```bash
-curl -u johan:hemligt123 -X DELETE http://localhost:8080/tasks/1
-```
-
 ## Screenshots
 
-### Application startup
+### Login page
 
-The app boots with Spring Boot's embedded Tomcat server and connects to an in-memory H2 database.
+![Login page](screenshots/login.png)
 
-![Application startup log](screenshots/startup.png)
+### Empty task list
 
-### Full CRUD cycle via curl
+![Empty task list](screenshots/TaskListEmpty.png)
 
-Creating, reading, updating and deleting tasks through the API, ending with an empty list after deletion.
+### Creating a task with categories and color picker
 
-![Full CRUD cycle in the terminal](screenshots/crudTerminal.png)
+![Creating a task](screenshots/CreatingTask.png)
 
-### Retrieving all tasks in the browser
+### Task list with priority badge and category pill
 
-A GET request to `/tasks` returns all stored tasks as JSON.
-
-![List of tasks returned as JSON](screenshots/threeTasks.png)
+![Task list](screenshots/TaskList1.png)
 
 ## Roadmap
 
@@ -307,18 +302,37 @@ The project is built in steps, each adding a focused layer of functionality. Com
 - [x] `DataSeeder` bootstraps an `admin` user with the `ADMIN` role in the dev profile.
 - [x] Object-level authorization (BOLA/IDOR) remains enforced for user-specific operations via `findByIdAndUserUserid` — role checks and object-level checks are complementary layers.
 
-### 🌐 Step 8 — Frontend
+### ✅ Step 8 — Proper authentication model
 
-- [ ] Build a frontend interface (technology to be decided later).
-- [ ] Proper login/logout endpoints (currently using HTTP Basic Authentication).
-- [ ] Re-enable CSRF protection (currently disabled because the API is consumed via curl only).
+- [x] `POST /auth/login` — authenticates and creates a server-side session
+- [x] `POST /auth/logout` — invalidates the session and deletes the JSESSIONID cookie
+- [x] `GET /auth/me` — returns the currently authenticated user with username and role
+- [x] Session invalidation on logout verified (old session cookie rejected with `401`)
+- [x] CSRF protection re-enabled via `CookieCsrfTokenRepository`
+- [x] CORS configured to allow the React frontend (`localhost:5173`) with credentials
 
-### 🔐 Step 9 — Sharing and advanced authentication
+### ✅ Step 9 — Frontend
 
-- [ ] Sharing tasks with other users (read/write permissions).
-- [ ] Decide how categories behave on shared tasks (likely visible-but-read-only, or per-user tagging).
-- [ ] Multi-factor authentication (TOTP first, with an extensible design that can support additional factors like YubiKey/WebAuthn and GPG-based challenges).
+- [x] Login and logout UI with session-based authentication
+- [x] Navbar showing logged-in username and ADMIN badge where applicable
+- [x] Task list with create, inline edit, delete and mark complete/incomplete
+- [x] Category combobox: search existing categories or create new ones with a color picker
+- [x] Filtering by search (title), completion status, priority and date range
+- [x] Sorting by title, deadline and priority
+- [x] Color-coded priority badges (HIGH=red, MEDIUM=yellow, LOW=green) and category pills
+- [x] Central `api.js` wrapper that handles CSRF token and session credentials automatically
+
+### 🔗 Step 10 — Sharing
+
+- [ ] Share tasks with other users with `READ` or `WRITE` permissions
+- [ ] Decide how categories behave on shared tasks (likely visible-but-read-only, or per-user tagging)
+
+### 🔐 Step 11 — Multi-factor authentication
+
+- [ ] TOTP (e.g. Google Authenticator) + recovery codes — implement first as it is the most common and practical
+- [ ] WebAuthn / YubiKey — add after TOTP is stable
+- [ ] GPG-based challenge-response — most advanced, implement last
 
 ## About
 
-A learning project for backend development with Java and Spring Boot.
+A full-stack learning project built with Java Spring Boot (backend) and React (frontend), developed to explore modern web application development from API design to user interface.

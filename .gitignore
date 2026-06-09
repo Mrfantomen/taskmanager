@@ -33,3 +33,22 @@ build/
 .vscode/
 cookies.txt
 admin-cookies.txt
+frontend/node_modules/
+frontend/dist/
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+
+# Backup-filer
+*.md~
+*.properties~
+
+# Cookie-filer från curl-testning
+cookies.txt
+admin-cookies.txt
+
+# Screenshots vi inte vill ha
+screenshots/JavaS1.png
+screenshots/javaS1.png
