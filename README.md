@@ -2,7 +2,7 @@
 
 A RESTful task management API built with Spring Boot, created as a learning project to explore backend development with Java, Spring, and JPA.
 
-This is an evolving project: it currently covers task CRUD, user accounts with a one-to-many relationship, authentication with Spring Security, and richer task logic (filtering, sorting, priority, categories, validation). It will be extended with centralized error handling and a frontend as I progress through my studies.
+This is an evolving project: it currently covers task CRUD, user accounts, authentication with Spring Security, richer task logic (filtering, sorting, priority, categories, validation), security hardening, and production-readiness features (response DTOs, centralized error handling, PostgreSQL, Swagger). It will be extended with an admin role and a frontend as the project grows.
 
 ## Features
 
@@ -10,25 +10,30 @@ This is an evolving project: it currently covers task CRUD, user accounts with a
 - Each task has a title, description, completion status, deadline, priority and categories
 - User accounts, where each task belongs to a user (one-to-many relationship)
 - User registration with Argon2id password hashing (OWASP-recommended)
-- Authentication and authorization with Spring Security (users only see their own tasks)
+- Authentication and authorization with Spring Security (users only see their own tasks — list, get, update and delete)
+- Object-level authorization (BOLA/IDOR protection): tasks are always scoped to the authenticated user
 - Server-side task ownership (the API ignores any user supplied in the request body and uses the authenticated user)
-- Password hashes are never exposed in API responses
+- Password hashes are never exposed in API responses (dedicated response DTOs for all entities)
+- Centralized error handling via `@ControllerAdvice` with consistent JSON error responses
 - **Priority** as a typed enum (`LOW`, `MEDIUM`, `HIGH`) — invalid values are rejected with `400 Bad Request`
 - **Categories** as their own entity, owned per user (`@ManyToMany` relationship between tasks and categories)
-- **Filtering** tasks via query parameters: `?completed=`, `?dueBefore=`, `?priority=`
+- **Filtering** tasks via query parameters — supports combining multiple filters: `?completed=`, `?dueBefore=`, `?priority=`, combinable via Spring Data `Specification`
 - **Sorting** tasks via `?sortBy=`, validated against an allow-list (reusable `SortValidator` class)
 - **Business rules**: titles are required, cannot be only whitespace, max 200 chars; deadlines cannot be in the past
 - Category names are normalized on save (lowercased, trimmed) so `"Work"` and `"  WORK  "` are the same category
-- Proper HTTP status codes (e.g. `201 Created` on registration, `400 Bad Request` for invalid input, `409 Conflict` for duplicate category names, `404 Not Found` for missing tasks, `204 No Content` on delete)
-- Seed data on startup (dev profile only) so users `johan` and `anna` exist without manual registration
-- In-memory H2 database for fast, zero-setup development
+- Proper HTTP status codes (e.g. `201 Created` on registration, `400 Bad Request` for invalid input, `409 Conflict` for duplicate category names, `404 Not Found` for missing resources, `204 No Content` on delete)
+- Seed data on startup (dev profile only) so users `johan` and `anna` exist with categories and tasks without manual setup
+- **PostgreSQL** support via Docker for persistent storage (prod profile)
+- **Swagger / OpenAPI** documentation available at `/swagger-ui.html`
 
 ## Tech stack
 
 - **Java 17**
 - **Spring Boot 3.5.14** (Spring Web, Spring Data JPA, Spring Security)
 - **Argon2id** password hashing via **Bouncy Castle**
-- **H2** in-memory database
+- **H2** in-memory database (dev profile)
+- **PostgreSQL 16** via Docker (prod profile)
+- **Springdoc OpenAPI** for Swagger UI
 - **Maven** for build and dependency management
 
 ## Architecture
@@ -38,16 +43,17 @@ The project follows a standard layered architecture:
 ```
 com.example.taskmanager
 ├── TaskmanagerApplication   # Application entry point
-├── config/                  # SecurityConfig, DataSeeder
+├── config/                  # SecurityConfig, DataSeeder, GlobalExceptionHandler, OpenApiConfig
 ├── model/                   # Data models (Task, TaskUser, Category, Priority enum)
-├── dto/                     # Data transfer objects (RegisterRequest, TaskRequest)
-├── repository/              # Database access (Spring Data JPA)
-├── service/                 # Business logic, authentication, validation
+├── dto/                     # Data transfer objects (RegisterRequest, TaskRequest, TaskResponse,
+│                            #   TaskUserResponse, CategoryResponse, ErrorResponse)
+├── repository/              # Database access (Spring Data JPA + Specification support)
+├── service/                 # Business logic, authentication, validation, DTO mapping
 ├── controller/              # REST endpoints (HTTP layer)
-└── validation/              # Reusable validators (SortValidator)
+└── validation/              # Reusable validators (SortValidator, TaskSpecification)
 ```
 
-A request flows from the **controller** (receives the HTTP call) to the **service** (business logic and validation) to the **repository** (database access), keeping each layer focused on a single responsibility. Relationships: `Task` references its owner `TaskUser` via `@ManyToOne`; `Task` and `Category` are joined via `@ManyToMany` (with a `task_category` join table); `Category` references its owner `TaskUser` via `@ManyToOne`. Spring Security sits in front of the controller layer and rejects unauthenticated requests before they reach application code.
+A request flows from the **controller** (receives the HTTP call) to the **service** (business logic, validation and DTO mapping) to the **repository** (database access), keeping each layer focused on a single responsibility. Controllers return response DTOs — never raw JPA entities. Relationships: `Task` references its owner `TaskUser` via `@ManyToOne`; `Task` and `Category` are joined via `@ManyToMany` (with a `task_category` join table); `Category` references its owner `TaskUser` via `@ManyToOne`. Spring Security sits in front of the controller layer and rejects unauthenticated requests before they reach application code.
 
 ## API endpoints
 
@@ -65,11 +71,11 @@ All task endpoints require authentication. Requests are scoped to the authentica
 
 | Method | Endpoint        | Description                                       |
 | ------ | --------------- | ------------------------------------------------- |
-| GET    | `/tasks`        | Get all tasks belonging to the authenticated user. Supports query parameters: `completed`, `dueBefore` (ISO date), `priority` (`LOW`/`MEDIUM`/`HIGH`), `sortBy` (`id`/`title`/`deadline`/`completed`) |
-| GET    | `/tasks/{id}`   | Get a single task by id                           |
+| GET    | `/tasks`        | Get all tasks belonging to the authenticated user. Supports query parameters: `completed`, `dueBefore` (ISO date), `priority` (`LOW`/`MEDIUM`/`HIGH`), `sortBy` (`id`/`title`/`deadline`/`completed`). Multiple filters can be combined. |
+| GET    | `/tasks/{id}`   | Get a single task by id (scoped to authenticated user) |
 | POST   | `/tasks`        | Create a new task (owned by the authenticated user). Body fields: `title`, `description`, `completed`, `deadline`, `priority`, `categoryIds` |
-| PUT    | `/tasks/{id}`   | Update an existing task (same body fields as POST)|
-| DELETE | `/tasks/{id}`   | Delete a task                                     |
+| PUT    | `/tasks/{id}`   | Update an existing task (same body fields as POST) |
+| DELETE | `/tasks/{id}`   | Delete a task (scoped to authenticated user)       |
 
 ### Categories
 
@@ -84,14 +90,16 @@ All category endpoints require authentication. Categories are private per user.
 
 ### Users
 
-| Method | Endpoint               | Description                       |
-| ------ | ---------------------- | --------------------------------- |
-| GET    | `/users`               | Get all users                     |
-| GET    | `/users/{id}`          | Get a single user by id           |
-| POST   | `/users`               | Create a new user                 |
-| PUT    | `/users/{id}`          | Update an existing user           |
-| DELETE | `/users/{id}`          | Delete a user                     |
-| GET    | `/users/{id}/tasks`    | Get all tasks for a specific user |
+> These endpoints currently return `403 Forbidden` and are reserved for a future admin role (Step 7).
+
+| Method | Endpoint               | Description                                    |
+| ------ | ---------------------- | ---------------------------------------------- |
+| POST   | `/users`               | Create a new user                              |
+| PUT    | `/users/{id}`          | Update an existing user                        |
+| DELETE | `/users/{id}`          | Delete a user                                  |
+| GET    | `/users`               | Admin only — not yet implemented (Step 7)      |
+| GET    | `/users/{id}`          | Admin only — not yet implemented (Step 7)      |
+| GET    | `/users/{id}/tasks`    | Admin only — not yet implemented (Step 7)      |
 
 ## Running the application
 
@@ -100,15 +108,48 @@ All category endpoints require authentication. Categories are private per user.
 - Java 17 or higher
 - Maven (or use the included Maven wrapper)
 
-### Start the app
+### Start the app (dev profile — H2 in-memory database)
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-The application starts on `http://localhost:8080`.
+The application starts on `http://localhost:8080`. The dev profile seeds `johan` (password: `hemligt123`) and `anna` (password: `annapass123`) with categories and tasks automatically.
 
-> **Note:** the H2 database runs in-memory, so all data is reset every time the application restarts. This is intentional for development.
+### Start the app (prod profile — PostgreSQL)
+
+First start the PostgreSQL container:
+
+```bash
+sudo docker start taskmanager-db
+```
+
+If the container does not exist yet, create it:
+
+```bash
+sudo docker run --name taskmanager-db \
+  -e POSTGRES_DB=taskmanager \
+  -e POSTGRES_USER=taskuser \
+  -e POSTGRES_PASSWORD=taskpass \
+  -p 5432:5432 \
+  -d postgres:16
+```
+
+Then start the app with the prod profile:
+
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=prod
+```
+
+Data persists across restarts when using PostgreSQL.
+
+### API documentation
+
+Swagger UI is available at:
+
+```
+http://localhost:8080/swagger-ui.html
+```
 
 ## Example usage
 
@@ -120,7 +161,7 @@ curl -X POST http://localhost:8080/auth/register \
   -d '{"username":"johan","password":"hemligt123"}'
 ```
 
-> The `dev` profile also seeds `johan` and `anna` automatically, so this step is optional locally.
+> The `dev` profile seeds `johan` and `anna` automatically, so this step is optional locally.
 
 Create a couple of categories:
 
@@ -142,23 +183,14 @@ curl -u johan:hemligt123 -X POST http://localhost:8080/tasks \
   -d '{"title":"Prepare meeting","completed":false,"deadline":"2026-12-15","priority":"HIGH","categoryIds":[1,2]}'
 ```
 
-Filter tasks:
+Filter and combine filters:
 
 ```bash
-# Only completed tasks
-curl -u johan:hemligt123 "http://localhost:8080/tasks?completed=true"
+# Only HIGH priority tasks that are not completed
+curl -u johan:hemligt123 "http://localhost:8080/tasks?priority=HIGH&completed=false"
 
-# Only HIGH priority
-curl -u johan:hemligt123 "http://localhost:8080/tasks?priority=HIGH"
-
-# Only tasks with a deadline before a certain date
-curl -u johan:hemligt123 "http://localhost:8080/tasks?dueBefore=2026-12-31"
-```
-
-Sort tasks:
-
-```bash
-curl -u johan:hemligt123 "http://localhost:8080/tasks?sortBy=deadline"
+# Tasks with deadline before a certain date, sorted by title
+curl -u johan:hemligt123 "http://localhost:8080/tasks?dueBefore=2026-12-31&sortBy=title"
 ```
 
 Update a task:
@@ -236,15 +268,15 @@ The project is built in steps, each adding a focused layer of functionality. Com
 - [x] **Remove or guard the `/users` endpoints**: `GET /users`, `GET /users/{id}` and `GET /users/{id}/tasks` now return `403 Forbidden` with a TODO comment until a proper admin role exists (Step 7).
 - [x] **Document the chosen Argon2 parameters** in `SecurityConfig` with a comment explaining the OWASP recommendation.
 
-### 🧹 Step 6 — Polish and production-readiness
+### ✅ Step 6 — Polish and production-readiness
 
-- [ ] **Response DTOs**: stop returning JPA entities (`Task`, `TaskUser`) directly. Map to dedicated response DTOs so new fields cannot accidentally leak through the API.
-- [ ] **Centralized error handling with `@ControllerAdvice`** and Bean Validation annotations (so that the current validation in `TaskService.validateTask` can move to a more declarative style).
-- [ ] **Combining multiple filters in one request** (e.g. `?completed=false&priority=HIGH`) — currently the first matching filter wins; a proper solution needs a dynamic query via `Specification` or similar.
-- [ ] **Remove unused repository methods** (`findByCompleted`, `findByDeadline`, `findAll` without user scope) so they cannot accidentally be used later and bypass ownership checks.
-- [ ] **Replace `System.out.println` with proper logging** (SLF4J), and avoid logging sensitive information.
-- [ ] Migrate from H2 to PostgreSQL (good opportunity to introduce Docker).
-- [ ] API documentation with Swagger / OpenAPI.
+- [x] **Response DTOs**: controllers return dedicated response DTOs (`TaskResponse`, `TaskUserResponse`, `CategoryResponse`, `ErrorResponse`) — never raw JPA entities.
+- [x] **Centralized error handling** via `GlobalExceptionHandler` (`@RestControllerAdvice`) with consistent JSON error responses including status, message and timestamp.
+- [x] **Combining multiple filters** in one request via Spring Data `Specification` — e.g. `?completed=false&priority=HIGH` works correctly.
+- [x] **Remove unused repository methods** (`findByCompleted`, `findByDeadline`, `findAll` without user scope).
+- [x] **Replaced `System.out.println` with SLF4J logging**.
+- [x] **Migrated from H2 to PostgreSQL** via Docker (prod profile) for persistent storage.
+- [x] **API documentation with Swagger / OpenAPI** available at `/swagger-ui.html`.
 
 ### 👤 Step 7 — Admin role
 
