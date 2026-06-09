@@ -7,7 +7,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import com.example.taskmanager.dto.CategoryResponse;
-import java.util.stream.Collectors;
 
 import java.util.List;
 

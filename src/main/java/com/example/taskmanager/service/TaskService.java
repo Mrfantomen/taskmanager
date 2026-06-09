@@ -19,38 +19,47 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import java.util.HashSet;
 import java.util.Set;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @Service
 public class TaskService {
 
 	private final TaskRepository taskRepository;
 
-
 	private final CategoryRepository categoryRepository;
+
 	// Konstruktor - Spring skickar automatiskt in repository här
 	public TaskService(TaskRepository taskRepository, CategoryRepository categoryRepository) {
-	    this.taskRepository = taskRepository;
-	    this.categoryRepository = categoryRepository;
+		this.taskRepository = taskRepository;
+		this.categoryRepository = categoryRepository;
 	}
-	// Hämta alla uppgifter
+	// -------------------------------------------------------
+	// Admin-only methods — do not call from user-facing code
+	// -------------------------------------------------------
+
+	/** Returns all tasks regardless of owner. For admin use only. */
+	@PreAuthorize("hasRole('ADMIN')")
 	public List<Task> getAllTasks() {
 		return taskRepository.findAll();
 	}
 
-	// Hämta en uppgift via id
+	/** Returns any task by id regardless of owner. For admin use only. */
+	@PreAuthorize("hasRole('ADMIN')")
 	public Optional<Task> getTaskById(Long id) {
 		return taskRepository.findById(id);
 	}
 
 	// Skapa eller uppdatera en uppgift
 	public Task saveTask(Task task) {
-	    validateTask(task);
-	    return taskRepository.save(task);
+		validateTask(task);
+		return taskRepository.save(task);
 	}
 
 	// Ta bort en uppgift via id
-	public void deleteTask(Long id) {
-		taskRepository.deleteById(id);
+	public void deleteTask(Long id, Long userid) {
+		Task task = taskRepository.findByIdAndUserUserid(id, userid)
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Task not found"));
+		taskRepository.delete(task);
 	}
 
 	public List<Task> getTasksByUserId(Long userid) {
@@ -60,73 +69,66 @@ public class TaskService {
 	public List<Task> findByUserUseridAndCompleted(Long userid, boolean completed) {
 		return taskRepository.findByUserUseridAndCompleted(userid, completed);
 	}
-	
+
 	public List<Task> findByUserUseridAndDeadlineBefore(Long userid, LocalDate deadline) {
-	    return taskRepository.findByUserUseridAndDeadlineBefore(userid, deadline);
+		return taskRepository.findByUserUseridAndDeadlineBefore(userid, deadline);
 	}
-	
+
 	public List<Task> getTasksByUserId(Long userid, Sort sort) {
-	    return taskRepository.findByUserUserid(userid, sort);
+		return taskRepository.findByUserUserid(userid, sort);
 	}
-	
+
 	public List<Task> findByUserUseridAndPriority(Long userid, Priority priority) {
-	    return taskRepository.findByUserUseridAndPriority(userid, priority);
+		return taskRepository.findByUserUseridAndPriority(userid, priority);
 	}
-	
+
 	public Task assignCategories(Task task, List<Long> categoryIds, Long userid) {
-	    if (categoryIds == null || categoryIds.isEmpty()) {
-	        task.setCategories(new HashSet<>());
-	        return task;
-	    }
-	    Set<Category> categories = new HashSet<>();
-	    for (Long categoryId : categoryIds) {
-	        Category category = categoryRepository.findByIdAndUserUserid(categoryId, userid)
-	                .orElseThrow(() -> new ResponseStatusException(
-	                        HttpStatus.BAD_REQUEST, 
-	                        "Category not found or not yours: " + categoryId));
-	        categories.add(category);
-	    }
-	    task.setCategories(categories);
-	    return task;
+		if (categoryIds == null || categoryIds.isEmpty()) {
+			task.setCategories(new HashSet<>());
+			return task;
+		}
+		Set<Category> categories = new HashSet<>();
+		for (Long categoryId : categoryIds) {
+			Category category = categoryRepository.findByIdAndUserUserid(categoryId, userid)
+					.orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+							"Category not found or not yours: " + categoryId));
+			categories.add(category);
+		}
+		task.setCategories(categories);
+		return task;
 	}
-	
+
 	private void validateTask(Task task) {
-	    if (task.getTitle() == null || task.getTitle().trim().isEmpty()) {
-	        throw new ResponseStatusException(
-	                HttpStatus.BAD_REQUEST, "Title is required");
-	    }
-	    if (task.getTitle().length() > 200) {
-	        throw new ResponseStatusException(
-	                HttpStatus.BAD_REQUEST, "Title is too long (max 200 characters)");
-	    }
-	    if (task.getDeadline() != null && task.getDeadline().isBefore(LocalDate.now())) {
-	        throw new ResponseStatusException(
-	                HttpStatus.BAD_REQUEST, "Deadline cannot be in the past");
-	    }
+		if (task.getTitle() == null || task.getTitle().trim().isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Title is required");
+		}
+		if (task.getTitle().length() > 200) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Title is too long (max 200 characters)");
+		}
+		if (task.getDeadline() != null && task.getDeadline().isBefore(LocalDate.now())) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Deadline cannot be in the past");
+		}
 	}
-	
+
 	public TaskResponse toResponse(Task task) {
-	    return TaskResponse.from(task);
+		return TaskResponse.from(task);
 	}
 
 	public List<TaskResponse> toResponseList(List<Task> tasks) {
-	    return tasks.stream()
-	            .map(TaskResponse::from)
-	            .collect(java.util.stream.Collectors.toList());
+		return tasks.stream().map(TaskResponse::from).collect(java.util.stream.Collectors.toList());
 	}
-	
+
 	public Task getTaskByIdForUser(Long id, Long userid) {
-	    return taskRepository.findByIdAndUserUserid(id, userid)
-	            .orElseThrow(() -> new ResponseStatusException(
-	                    HttpStatus.NOT_FOUND, "Task not found"));
+		return taskRepository.findByIdAndUserUserid(id, userid)
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Task not found"));
 	}
-	
+
 	public List<Task> findBySpecification(Specification<Task> spec) {
-	    return taskRepository.findAll(spec);
+		return taskRepository.findAll(spec);
 	}
-	
-	public List<Task> findBySpecification(Specification<Task> spec, 
-            org.springframework.data.domain.Sort sort) {
-return taskRepository.findAll(spec, sort);
-}
+
+	public List<Task> findBySpecification(Specification<Task> spec, org.springframework.data.domain.Sort sort) {
+		return taskRepository.findAll(spec, sort);
+	}
+
 }

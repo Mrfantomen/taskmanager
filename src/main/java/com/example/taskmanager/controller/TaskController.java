@@ -69,11 +69,7 @@ public class TaskController {
 	    return taskService.toResponseList(tasks);
 	}
 
-	@GetMapping("/{id}")
-	public TaskResponse getTaskById(@PathVariable Long id) {
-		TaskUser currentUser = authService.getCurrentUser();
-		return taskService.toResponse(taskService.getTaskByIdForUser(id, currentUser.getUserid()));
-	}
+
 
 	@PostMapping
 	public TaskResponse createTask(@RequestBody TaskRequest request) {
@@ -104,9 +100,8 @@ public class TaskController {
 
 	@DeleteMapping("/{id}")
 	public ResponseEntity<Void> deleteTask(@PathVariable Long id) {
-		TaskUser currentUser = authService.getCurrentUser();
-		taskService.getTaskByIdForUser(id, currentUser.getUserid());
-		taskService.deleteTask(id);
-		return ResponseEntity.noContent().build();
+	    TaskUser currentUser = authService.getCurrentUser();
+	    taskService.deleteTask(id, currentUser.getUserid());
+	    return ResponseEntity.noContent().build();
 	}
 }
