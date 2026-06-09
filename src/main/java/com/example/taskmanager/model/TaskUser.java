@@ -1,48 +1,60 @@
 package com.example.taskmanager.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 public class TaskUser {
 
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private Long userid;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long userid;
 
-	private String username;
-	
-	@JsonIgnore
-	private String passwordHash;
+    private String username;
 
-	// Tom konstruktor krävs av JPA
-	public TaskUser() {
-	}
+    @JsonIgnore
+    private String passwordHash;
 
-	public Long getUserid() {
-		return userid;
-	}
+    @Enumerated(EnumType.STRING)
+    private Role role = Role.USER;
 
-	public void setUserid(Long userid) {
-		this.userid = userid;
-	}
+    public TaskUser() {
+    }
 
-	public String getUsername() {
-		return username;
-	}
+    public Long getUserid() {
+        return userid;
+    }
 
-	public void setUsername(String username) {
-		this.username = username;
-	}
+    public void setUserid(Long userid) {
+        this.userid = userid;
+    }
 
-	public String getPasswordHash() {
-		return passwordHash;
-	}
+    public String getUsername() {
+        return username;
+    }
 
-	public void setPasswordHash(String passwordHash) {
-		this.passwordHash = passwordHash;
-	}
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    public Role getRole() {
+        return role;
+    }
+
+    public void setRole(Role role) {
+        this.role = role;
+    }
 }
