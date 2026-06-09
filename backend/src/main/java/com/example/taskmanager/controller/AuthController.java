@@ -5,26 +5,34 @@ import com.example.taskmanager.model.TaskUser;
 import com.example.taskmanager.service.AuthService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.example.taskmanager.dto.TaskUserResponse;
 
+
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
 
-    private final AuthService authService;
+	private final AuthService authService;
 
-    public AuthController(AuthService authService) {
-        this.authService = authService;
-    }
+	public AuthController(AuthService authService) {
+		this.authService = authService;
+	}
 
-    @PostMapping("/register")
-    public ResponseEntity<TaskUserResponse> register(@RequestBody RegisterRequest request) {
-        TaskUser user = authService.register(request);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(TaskUserResponse.from(user));
-    }
+	@PostMapping("/register")
+	public ResponseEntity<TaskUserResponse> register(@RequestBody RegisterRequest request) {
+		TaskUser user = authService.register(request);
+		return ResponseEntity.status(HttpStatus.CREATED).body(TaskUserResponse.from(user));
+	}
+	
+	@GetMapping("/me")
+	public TaskUserResponse me() {
+	    TaskUser currentUser = authService.getCurrentUser();
+	    return TaskUserResponse.from(currentUser);
+	}
+
 }
