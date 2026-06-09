@@ -2,7 +2,7 @@
 
 A RESTful task management API built with Spring Boot, created as a learning project to explore backend development with Java, Spring, and JPA.
 
-This is an evolving project: it currently covers task CRUD, user accounts, authentication with Spring Security, richer task logic (filtering, sorting, priority, categories, validation), security hardening, and production-readiness features (response DTOs, centralized error handling, PostgreSQL, Swagger). It will be extended with an admin role and a frontend as the project grows.
+This is an evolving project: it currently covers task CRUD, user accounts, authentication with Spring Security, richer task logic (filtering, sorting, priority, categories, validation), security hardening, production-readiness features (response DTOs, centralized error handling, PostgreSQL, Swagger), and a role-based admin system. It will be extended with a frontend as the project grows.
 
 ## Features
 
@@ -25,6 +25,9 @@ This is an evolving project: it currently covers task CRUD, user accounts, authe
 - Seed data on startup (dev profile only) so users `johan` and `anna` exist with categories and tasks without manual setup
 - **PostgreSQL** support via Docker for persistent storage (prod profile)
 - **Swagger / OpenAPI** documentation available at `/swagger-ui.html`
+- **Role-based access control**: users have a `USER` or `ADMIN` role — admins can access `/admin/**` endpoints
+- **Admin endpoints** under `/admin/**` protected by both request-level (`SecurityConfig`) and method-level (`@PreAuthorize`) security — defence in depth
+- Seed data includes an `admin` user (dev profile only) with the `ADMIN` role
 
 ## Tech stack
 
@@ -44,12 +47,13 @@ The project follows a standard layered architecture:
 com.example.taskmanager
 ├── TaskmanagerApplication   # Application entry point
 ├── config/                  # SecurityConfig, DataSeeder, GlobalExceptionHandler, OpenApiConfig
-├── model/                   # Data models (Task, TaskUser, Category, Priority enum)
+├── model/                   # Data models (Task, TaskUser, Category, Priority enum, Role enum)
 ├── dto/                     # Data transfer objects (RegisterRequest, TaskRequest, TaskResponse,
 │                            #   TaskUserResponse, CategoryResponse, ErrorResponse)
 ├── repository/              # Database access (Spring Data JPA + Specification support)
 ├── service/                 # Business logic, authentication, validation, DTO mapping
-├── controller/              # REST endpoints (HTTP layer)
+├── controller/              # REST endpoints (TaskController, CategoryController,
+│                            #   TaskUserController, AuthController, AdminController)
 └── validation/              # Reusable validators (SortValidator, TaskSpecification)
 ```
 
@@ -90,16 +94,23 @@ All category endpoints require authentication. Categories are private per user.
 
 ### Users
 
-> These endpoints currently return `403 Forbidden` and are reserved for a future admin role (Step 7).
-
 | Method | Endpoint               | Description                                    |
 | ------ | ---------------------- | ---------------------------------------------- |
 | POST   | `/users`               | Create a new user                              |
 | PUT    | `/users/{id}`          | Update an existing user                        |
 | DELETE | `/users/{id}`          | Delete a user                                  |
-| GET    | `/users`               | Admin only — not yet implemented (Step 7)      |
-| GET    | `/users/{id}`          | Admin only — not yet implemented (Step 7)      |
-| GET    | `/users/{id}/tasks`    | Admin only — not yet implemented (Step 7)      |
+
+### Admin
+
+All admin endpoints require the `ADMIN` role. Protected by both `SecurityConfig` and `@PreAuthorize`.
+
+| Method | Endpoint                    | Description                              |
+| ------ | --------------------------- | ---------------------------------------- |
+| GET    | `/admin/users`              | List all users in the system             |
+| GET    | `/admin/users/{id}`         | Get a specific user by id                |
+| GET    | `/admin/users/{id}/tasks`   | Get all tasks for a specific user        |
+| GET    | `/admin/tasks`              | List all tasks in the system             |
+| GET    | `/admin/tasks/{id}`         | Get any task by id                       |
 
 ## Running the application
 
@@ -114,7 +125,15 @@ All category endpoints require authentication. Categories are private per user.
 ./mvnw spring-boot:run
 ```
 
-The application starts on `http://localhost:8080`. The dev profile seeds `johan` (password: `hemligt123`) and `anna` (password: `annapass123`) with categories and tasks automatically.
+The application starts on `http://localhost:8080`. The dev profile seeds three users automatically:
+
+| Username | Password     | Role    |
+| -------- | ------------ | ------- |
+| `johan`  | `hemligt123` | `USER`  |
+| `anna`   | `annapass123`| `USER`  |
+| `admin`  | `admin123`   | `ADMIN` |
+
+Johan gets a welcome task with categories and HIGH priority. Anna gets a medium priority task.
 
 ### Start the app (prod profile — PostgreSQL)
 
@@ -278,11 +297,15 @@ The project is built in steps, each adding a focused layer of functionality. Com
 - [x] **Migrated from H2 to PostgreSQL** via Docker (prod profile) for persistent storage.
 - [x] **API documentation with Swagger / OpenAPI** available at `/swagger-ui.html`.
 
-### 👤 Step 7 — Admin role
+### ✅ Step 7 — Admin role
 
-- [ ] Add roles to `TaskUser` (e.g. `USER`, `ADMIN`).
-- [ ] Restore the `/users` endpoints as admin-only (`@PreAuthorize` or equivalent), so an admin can list and inspect users without exposing them to regular users.
-- [ ] Decide on the bootstrap process for the first admin (seed-only in dev profile, or a one-time promotion mechanism in production).
+- [x] Added `Role` enum (`USER`, `ADMIN`) and `role` field on `TaskUser` (defaults to `USER`).
+- [x] `CustomUserDetailsService` maps the role to a Spring Security authority (`ROLE_USER`, `ROLE_ADMIN`).
+- [x] `SecurityConfig` protects `/admin/**` with `hasRole("ADMIN")` at request level.
+- [x] `AdminController` under `/admin/**` with endpoints for listing users, inspecting any user's tasks, and listing all tasks.
+- [x] Admin-only methods in `TaskService` annotated with `@PreAuthorize("hasRole('ADMIN')")` — defence in depth.
+- [x] `DataSeeder` bootstraps an `admin` user with the `ADMIN` role in the dev profile.
+- [x] Object-level authorization (BOLA/IDOR) remains enforced for user-specific operations via `findByIdAndUserUserid` — role checks and object-level checks are complementary layers.
 
 ### 🌐 Step 8 — Frontend
 
